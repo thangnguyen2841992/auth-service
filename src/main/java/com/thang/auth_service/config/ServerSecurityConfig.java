@@ -105,7 +105,7 @@ public class ServerSecurityConfig {
     // In memory Client Register
     @Bean
     public RegisteredClientRepository registeredClientRepository() {
-        RegisteredClient registeredClient = RegisteredClient.withId("test").clientId("client").clientSecret(passwordEncoder().encode("123"))
+        RegisteredClient registeredClient = RegisteredClient.withId("jmaster").clientId("jmaster").clientSecret(passwordEncoder().encode("123"))
                 .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
@@ -117,7 +117,16 @@ public class ServerSecurityConfig {
                 .clientSettings(ClientSettings.builder().requireAuthorizationConsent(true).build())
                 .tokenSettings(TokenSettings.builder().accessTokenTimeToLive(Duration.ofMinutes(10)).refreshTokenTimeToLive(Duration.ofMinutes(3600)).build())
                 .build();
-         return new InMemoryRegisteredClientRepository(registeredClient);
+
+        RegisteredClient accountService = RegisteredClient.withId("accountservice")
+                .clientId("accountservice")
+                .clientSecret(passwordEncoder().encode("123"))
+                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+                .scope("log").scope("notification")
+                .tokenSettings(TokenSettings.builder().accessTokenTimeToLive(Duration.ofMinutes(5)).build())
+                .build();
+         return new InMemoryRegisteredClientRepository(registeredClient, accountService);
     }
 
     @Bean
@@ -146,9 +155,9 @@ public class ServerSecurityConfig {
     }
 
     private static KeyPair generateKeyPair() throws NoSuchAlgorithmException {
-        KeyStoreKeyFactory keyStoreKeyFactory = new KeyStoreKeyFactory(new ClassPathResource("thang.jks"),
-                "thuthuyda1".toCharArray());
-        return keyStoreKeyFactory.getKeyPair("thangdeptrai");
+        KeyStoreKeyFactory keyStoreKeyFactory = new KeyStoreKeyFactory(new ClassPathResource("jmasterio.jks"),
+                "123456".toCharArray());
+        return keyStoreKeyFactory.getKeyPair("jmasterio");
     }
 
 }
