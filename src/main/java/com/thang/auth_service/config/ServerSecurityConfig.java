@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -25,6 +26,7 @@ import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.client.InMemoryRegisteredClientRepository;
+import org.springframework.security.oauth2.server.authorization.client.JdbcRegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configuration.OAuth2AuthorizationServerConfiguration;
@@ -67,13 +69,17 @@ public class ServerSecurityConfig {
     @Order(1)
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http);
-        http.getConfigurer(OAuth2AuthorizationServerConfigurer.class).oidc(Customizer.withDefaults()); //Enable OpenId Connect 1.0
+        http.getConfigurer(OAuth2AuthorizationServerConfigurer.class)
+                .oidc(oidc -> oidc.clientRegistrationEndpoint(Customizer.withDefaults()));
+//                .oidc(Customizer.withDefaults()); //Enable OpenId Connect 1.0
 
         //Redirect to the login page when not authenticated from the authorization endpoint
         http.exceptionHandling((exception) -> exception.defaultAuthenticationEntryPointFor(
-                new LoginUrlAuthenticationEntryPoint("/login"),
-                new MediaTypeRequestMatcher(MediaType.TEXT_HTML)
-        ));
+                        new LoginUrlAuthenticationEntryPoint("/login"),
+                        new MediaTypeRequestMatcher(MediaType.TEXT_HTML)
+                ))
+                //Accept access token for User Info and/or Client Registration
+                .oauth2ResourceServer((resourceServer -> resourceServer.jwt(Customizer.withDefaults())));
         http.cors(Customizer.withDefaults());
         return http.formLogin(Customizer.withDefaults()).build();
     }
@@ -102,9 +108,10 @@ public class ServerSecurityConfig {
     PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
+
     // In memory Client Register
     @Bean
-    public RegisteredClientRepository registeredClientRepository() {
+    public RegisteredClientRepository registeredClientRepository(JdbcTemplate jdbcTemplate) {
         RegisteredClient registeredClient = RegisteredClient.withId("jmaster").clientId("jmaster").clientSecret(passwordEncoder().encode("123"))
                 .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
@@ -126,7 +133,22 @@ public class ServerSecurityConfig {
                 .scope("log").scope("notification")
                 .tokenSettings(TokenSettings.builder().accessTokenTimeToLive(Duration.ofMinutes(5)).build())
                 .build();
-         return new InMemoryRegisteredClientRepository(registeredClient, accountService);
+
+        RegisteredClient registrarClient = RegisteredClient.withId("registrar-client")
+                .clientId("registrar-client")
+                .clientSecret(passwordEncoder().encode("123"))
+                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+                .scope("client.create")
+                .scope("client.read")
+                .tokenSettings(TokenSettings.builder().accessTokenTimeToLive(Duration.ofMinutes(5)).build())
+                .build();
+
+        JdbcRegisteredClientRepository repository = new JdbcRegisteredClientRepository(jdbcTemplate);
+        repository.save(registeredClient);
+        repository.save(accountService);
+        repository.save(registrarClient);
+        return repository;
     }
 
     @Bean
@@ -140,6 +162,7 @@ public class ServerSecurityConfig {
             }
         });
     }
+
     @Bean
     public JWKSource<SecurityContext> jwkSource() throws NoSuchAlgorithmException {
         KeyPair keyPair = generateKeyPair();
