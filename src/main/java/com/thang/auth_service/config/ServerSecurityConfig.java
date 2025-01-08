@@ -108,23 +108,25 @@ public class ServerSecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    // In memory Client Register
     @Bean
     public RegisteredClientRepository registeredClientRepository(JdbcTemplate jdbcTemplate) {
-        RegisteredClient registeredClient = RegisteredClient.withId("jmaster").clientId("jmaster").clientSecret(passwordEncoder().encode("123"))
+        RegisteredClient jmaster = RegisteredClient.withId("jmaster")
+                .clientId("jmaster")
+                .clientSecret(passwordEncoder().encode("123"))
                 .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
                 .redirectUri("https://oauthdebugger.com/debug")
                 .redirectUri("http://127.0.0.1:5500")
                 .redirectUri("http://127.0.0.1:3000/login")
+//                .postLogoutRedirectUri("https://oauthdebugger.com/debug")
                 .scope("read")
                 .scope("write")
                 .clientSettings(ClientSettings.builder().requireAuthorizationConsent(true).build())
                 .tokenSettings(TokenSettings.builder().accessTokenTimeToLive(Duration.ofMinutes(10)).refreshTokenTimeToLive(Duration.ofMinutes(3600)).build())
                 .build();
 
-        RegisteredClient accountService = RegisteredClient.withId("accountservice")
+        RegisteredClient accountservice = RegisteredClient.withId("accountservice")
                 .clientId("accountservice")
                 .clientSecret(passwordEncoder().encode("123"))
                 .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
@@ -143,11 +145,15 @@ public class ServerSecurityConfig {
                 .tokenSettings(TokenSettings.builder().accessTokenTimeToLive(Duration.ofMinutes(5)).build())
                 .build();
 
-        JdbcRegisteredClientRepository repository = new JdbcRegisteredClientRepository(jdbcTemplate);
-        repository.save(registeredClient);
-        repository.save(accountService);
-        repository.save(registrarClient);
-        return repository;
+//        return new InMemoryRegisteredClientRepository(jmaster, accountservice, registrarClient);
+
+        /// JDBC CLIENT - INIT CLIENT DUMP DATA
+        JdbcRegisteredClientRepository registeredClientRepository = new JdbcRegisteredClientRepository(jdbcTemplate);
+        registeredClientRepository.save(jmaster);
+        registeredClientRepository.save(accountservice);
+        registeredClientRepository.save(registrarClient);
+
+        return registeredClientRepository;
     }
 
     @Bean
